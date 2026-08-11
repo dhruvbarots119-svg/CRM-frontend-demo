@@ -1,0 +1,36 @@
+{
+  "app_name": "SAI — Smart Agent Intelligence",
+  "app_type": "mobile_web_app / hybrid_fullstack mobile responsive PWA",
+  "design_context": "Dashboard & SaaS PropTech OS (Dubai Real Estate)",
+  "emotional_tone": "Authoritative, intelligent, precise, high-end luxury combined with elite operational clarity",
+  "typography": {
+    "headings": "Outfit, sans-serif",
+    "body": "Plus Jakarta Sans, sans-serif",
+    "mono": "JetBrains Mono, monospace"
+  },
+  "colors": {
+    "primary": "#0F172A",
+    "secondary": "#3B82F6",
+    "accent": "#D97706",
+    "dubai_gold": "#C5A880",
+    "background_light": "#F8FAFC",
+    "background_dark": "#090D16",
+    "surface_card": "#FFFFFF",
+    "surface_card_dark": "#111827",
+    "border_subtle": "#E2E8F0",
+    "border_subtle_dark": "#1F2937",
+    "forbidden_colors": ["#7351B7", "#1B93A4"]
+  },
+  "image_urls": {
+    "dubai_skyline": "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?crop=entropy&cs=srgb&fm=jpg&q=85",
+    "executive_portrait": "https://images.unsplash.com/photo-1758518727984-17b37f2f0562?crop=entropy&cs=srgb&fm=jpg&q=85",
+    "luxury_interior": "https://images.unsplash.com/photo-1643376452350-97eadd2c417f?crop=entropy&cs=srgb&fm=jpg&q=85"
+  },
+  "universal_guidelines": [
+    "NEVER use pure black #000000 for backgrounds; tint with deep cool slate #090D16",
+    "Include data-testid on all interactive and informational elements",
+    "Maintain high APCA contrast ratios on all cards and tables",
+    "Provide responsive mobile-first views with bottom navigation and desktop sidebar",
+    "Ensure deterministic interactive workflows for Sarah Khan and Ahmed Rahman"
+  ]
+}
