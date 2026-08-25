@@ -1,72 +1,208 @@
-import React, { useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
-import { metrics, navItems, priorities, projects } from '@/src/sai-data';
+// SAI — Smart Agent Intelligence
+// Main app shell: header, tabs, screens, sheets, and the 5-minute reminder poller.
 
-type Screen = 'home' | 'leads' | 'inbox' | 'more' | string;
-const navy = '#0F172A'; const gold = '#C5A880'; const ink = '#152238'; const muted = '#64748B'; const line = '#E2E8F0';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { StatusBar, StyleSheet, View } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { colors } from '@/src/theme';
+import { AppProvider, useApp, visibleTasks } from '@/src/store/AppContext';
+import { ToastProvider } from '@/src/components/Toast';
+import { Header } from '@/src/components/Header';
+import { BottomTabs, TabKey } from '@/src/components/BottomTabs';
+
+import { CommandCenterScreen } from '@/src/screens/CommandCenterScreen';
+import { LeadsScreen } from '@/src/screens/LeadsScreen';
+import { LeadDetailSheet } from '@/src/screens/LeadDetailSheet';
+import { AddLeadSheet } from '@/src/screens/AddLeadSheet';
+import {
+  PropertiesScreen,
+  PropertyDetailSheet,
+  AddPropertySheet,
+} from '@/src/screens/PropertiesScreen';
+import {
+  TasksScreen,
+  TaskDetailSheet,
+  AddTaskSheet,
+} from '@/src/screens/TasksScreen';
+import { InboxScreen, MessageDetailSheet } from '@/src/screens/InboxScreen';
+import { AdminScreen } from '@/src/screens/AdminScreen';
+import { AskSaiSheet } from '@/src/screens/AskSaiSheet';
+import { GlobalSearchSheet } from '@/src/screens/GlobalSearchSheet';
+import { NotificationsSheet } from '@/src/screens/NotificationsSheet';
+import { MoreScreen, MoreDest } from '@/src/screens/MoreScreen';
+import { SettingsScreen } from '@/src/screens/SettingsScreen';
+import { AddMenu } from '@/src/screens/AddMenu';
+
+type Screen = TabKey | 'properties' | 'tasks' | 'admin' | 'settings';
+
+const TITLES: Record<Screen, { title: string; eyebrow: string }> = {
+  home: { title: 'Command Center', eyebrow: 'TODAY' },
+  leads: { title: 'Leads & Pipeline', eyebrow: 'PIPELINE' },
+  inbox: { title: 'Unified Inbox', eyebrow: 'CONVERSATIONS' },
+  more: { title: 'Workspace', eyebrow: 'MODULES' },
+  properties: { title: 'Properties', eyebrow: 'LISTINGS' },
+  tasks: { title: 'Tasks & Reminders', eyebrow: 'TODO' },
+  admin: { title: 'Team & Analytics', eyebrow: 'REPORTS' },
+  settings: { title: 'Settings', eyebrow: 'PREFERENCES' },
+};
+
+const AppShell: React.FC = () => {
+  const { state, pushNotification } = useApp();
+  const [screen, setScreen] = useState<Screen>('home');
+
+  const [leadId, setLeadId] = useState<string | null>(null);
+  const [propertyId, setPropertyId] = useState<string | null>(null);
+  const [taskId, setTaskId] = useState<string | null>(null);
+  const [messageId, setMessageId] = useState<string | null>(null);
+  const [addLeadOpen, setAddLeadOpen] = useState(false);
+  const [addPropertyOpen, setAddPropertyOpen] = useState(false);
+  const [addTaskOpen, setAddTaskOpen] = useState(false);
+  const [askOpen, setAskOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+
+  // In-app reminder poller — every 5 minutes check for overdue tasks and push a
+  // notification once per task per app session.
+  const remindedTaskIds = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!state.hydrated) return;
+    const check = () => {
+      const now = Date.now();
+      const overdue = visibleTasks(state).filter(
+        (t) => t.status === 'Pending' && new Date(t.dueAt).getTime() <= now,
+      );
+      overdue.forEach((t) => {
+        if (remindedTaskIds.current.has(t.id)) return;
+        remindedTaskIds.current.add(t.id);
+        pushNotification({
+          title: 'Task overdue',
+          body: `${t.title} — due ${new Date(t.dueAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}.`,
+          kind: 'reminder',
+          taskId: t.id,
+        });
+      });
+    };
+    check();
+    const int = setInterval(check, 5 * 60 * 1000);
+    return () => clearInterval(int);
+  }, [state, pushNotification]);
+
+  const onNavigate = useCallback((k: TabKey) => setScreen(k), []);
+  const onAdd = useCallback(() => setAddMenuOpen(true), []);
+
+  const goMore = (d: MoreDest) => {
+    switch (d) {
+      case 'properties':
+        setScreen('properties');
+        break;
+      case 'tasks':
+        setScreen('tasks');
+        break;
+      case 'admin':
+        setScreen('admin');
+        break;
+      case 'ask':
+        setAskOpen(true);
+        break;
+      case 'settings':
+        setScreen('settings');
+        break;
+    }
+  };
+
+  const meta = TITLES[screen];
+
+  return (
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.surface} />
+      <Header
+        title={meta.title}
+        eyebrow={meta.eyebrow}
+        onSearch={() => setSearchOpen(true)}
+        onNotifications={() => setNotifOpen(true)}
+        onAskSai={() => setAskOpen(true)}
+      />
+      <View style={styles.body}>
+        {screen === 'home' && (
+          <CommandCenterScreen
+            onOpenLead={setLeadId}
+            onOpenTask={setTaskId}
+            goLeads={() => setScreen('leads')}
+            goInbox={() => setScreen('inbox')}
+          />
+        )}
+        {screen === 'leads' && <LeadsScreen onOpenLead={setLeadId} onAddLead={() => setAddLeadOpen(true)} />}
+        {screen === 'inbox' && <InboxScreen onOpenMessage={setMessageId} />}
+        {screen === 'more' && <MoreScreen onNavigate={goMore} />}
+        {screen === 'properties' && (
+          <PropertiesScreen onOpenProperty={setPropertyId} onAddProperty={() => setAddPropertyOpen(true)} />
+        )}
+        {screen === 'tasks' && <TasksScreen onAddTask={() => setAddTaskOpen(true)} onOpenTask={setTaskId} />}
+        {screen === 'admin' && <AdminScreen />}
+        {screen === 'settings' && <SettingsScreen />}
+      </View>
+
+      <BottomTabs
+        active={(['home', 'leads', 'inbox', 'more'].includes(screen) ? (screen as TabKey) : 'more') as TabKey}
+        onNavigate={onNavigate}
+        onAdd={onAdd}
+      />
+
+      {/* Sheets */}
+      <LeadDetailSheet leadId={leadId} onClose={() => setLeadId(null)} onOpenProperty={setPropertyId} />
+      <AddLeadSheet visible={addLeadOpen} onClose={() => setAddLeadOpen(false)} onCreated={(id) => setLeadId(id)} />
+      <PropertyDetailSheet propertyId={propertyId} onClose={() => setPropertyId(null)} />
+      <AddPropertySheet visible={addPropertyOpen} onClose={() => setAddPropertyOpen(false)} />
+      <TaskDetailSheet taskId={taskId} onClose={() => setTaskId(null)} />
+      <AddTaskSheet visible={addTaskOpen} onClose={() => setAddTaskOpen(false)} />
+      <MessageDetailSheet
+        messageId={messageId}
+        onClose={() => setMessageId(null)}
+        onLeadCreated={(id) => setLeadId(id)}
+      />
+      <AskSaiSheet visible={askOpen} onClose={() => setAskOpen(false)} />
+      <GlobalSearchSheet
+        visible={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        onOpenLead={setLeadId}
+        onOpenProperty={setPropertyId}
+        onOpenTask={setTaskId}
+        onOpenMessage={setMessageId}
+      />
+      <NotificationsSheet
+        visible={notifOpen}
+        onClose={() => setNotifOpen(false)}
+        onOpenLead={setLeadId}
+        onOpenTask={setTaskId}
+      />
+      <AddMenu
+        visible={addMenuOpen}
+        onClose={() => setAddMenuOpen(false)}
+        onPick={(a) => {
+          if (a === 'lead') setAddLeadOpen(true);
+          else if (a === 'task') setAddTaskOpen(true);
+          else if (a === 'property') setAddPropertyOpen(true);
+          else if (a === 'ask') setAskOpen(true);
+        }}
+      />
+    </SafeAreaView>
+  );
+};
 
 export default function Index() {
-  const [screen, setScreen] = useState<Screen>('home');
-  const [modal, setModal] = useState<string | null>(null);
-  const [ask, setAsk] = useState('');
-  const [askAnswer, setAskAnswer] = useState('');
-  const { width } = useWindowDimensions();
-  const isWide = width > 720;
-  const currentTitle = screen === 'home' ? 'Command Center' : screen === 'more' ? 'Workspace' : screen === 'inbox' ? 'Unified Inbox' : screen === 'leads' ? 'Leads & Pipeline' : navItems.find((item) => item[0] === screen)?.[1] || 'Workspace';
-
-  const askResponse = useMemo(() => {
-    const q = ask.toLowerCase();
-    if (q.includes('sarah') || q.includes('follow')) return 'Prioritize Sarah Khan first: her score is 87/100, she increased her budget and has viewed Marina Gate twice. Send two Marina 2BR alternatives, then book a viewing.';
-    if (q.includes('risk') || q.includes('deal')) return 'One deal needs attention: Sarah Khan’s mortgage approval is missing. Request the document today; the deal is otherwise ready for contract.';
-    if (q.includes('ahmed') || q.includes('off')) return 'Sobha Hartland II is the strongest Ahmed match at 92%. Its 20/40/40 plan keeps entry manageable and aligns to a 5-year hold.';
-    return 'I found 3 recommended actions: follow up with Sarah, send Ahmed a payment-plan comparison, and request James Wilson’s seller response.';
-  }, [ask]);
-
-  const go = (target: string) => setScreen(target);
-  return <SafeAreaView style={styles.safe}>
-    <View style={styles.appShell}>
-      {isWide && <Sidebar screen={screen} go={go} />}
-      <View style={styles.main}>
-        <Header title={currentTitle} onAsk={() => setModal('ask')} />
-        {screen === 'home' && <Home setModal={setModal} go={go} />}
-        {screen === 'leads' && <Leads setModal={setModal} />}
-        {screen === 'inbox' && <Inbox setModal={setModal} />}
-        {screen === 'more' && <More go={go} setModal={setModal} />}
-        {!['home', 'leads', 'inbox', 'more'].includes(screen) && <Module title={currentTitle} setModal={setModal} />}
-      </View>
-    </View>
-    {!isWide && <BottomNav screen={screen} go={go} onAdd={() => setModal('add')} />}
-    <Modal visible={!!modal} transparent animationType="slide" onRequestClose={() => setModal(null)}>
-      <View style={styles.modalBackdrop}><KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ maxHeight: '88%' }}><View style={styles.modalCard}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 36 }}>
-        {modal === 'ask' ? <><View style={styles.modalTitleRow}><View><Text style={styles.eyebrow}>INTELLIGENCE LAYER</Text><Text style={styles.modalTitle}>Ask SAI</Text></View><Close onPress={() => setModal(null)} /></View><Text style={styles.modalSub}>Ask about your clients, properties or next actions.</Text><TextInput autoFocus value={ask} onChangeText={setAsk} placeholder="Which clients should I follow up with?" placeholderTextColor="#94A3B8" style={styles.input} /><Pressable testID="ask-submit" style={styles.primaryButton} onPress={() => setAskAnswer(askResponse)}><Icon name="sparkles" size={18} color="#fff" /><Text style={styles.primaryText}>Ask SAI</Text></Pressable>{askAnswer ? <View style={styles.answer}><Icon name="lightbulb-on-outline" size={22} color={gold} /><Text style={styles.answerText}>{askAnswer}</Text></View> : null}</> : <ActionModal type={modal || 'add'} close={() => setModal(null)} />}
-      </ScrollView></View></KeyboardAvoidingView></View>
-    </Modal>
-  </SafeAreaView>;
+  return (
+    <SafeAreaProvider>
+      <AppProvider>
+        <ToastProvider>
+          <AppShell />
+        </ToastProvider>
+      </AppProvider>
+    </SafeAreaProvider>
+  );
 }
 
-function Header({ title, onAsk }: { title: string; onAsk: () => void }) { return <View style={styles.header}><View><Text style={styles.headerKicker}>SAI / OPERATING SYSTEM</Text><Text style={styles.headerTitle}>{title}</Text></View><View style={styles.headerActions}><Pressable testID="ask-sai" onPress={onAsk} style={styles.askButton}><Icon name="sparkles" size={16} color={navy} /><Text style={styles.askText}>Ask SAI</Text></Pressable><View style={styles.avatar}><Text style={styles.avatarText}>DK</Text></View></View></View>; }
-function Sidebar({ screen, go }: { screen: string; go: (s: string) => void }) { return <View style={styles.sidebar}><View style={styles.brand}><View style={styles.brandMark}><Text style={styles.brandMarkText}>S</Text></View><View><Text style={styles.brandName}>SAI</Text><Text style={styles.brandTag}>SMART AGENT INTELLIGENCE</Text></View></View><Text style={styles.menuLabel}>WORKSPACE</Text><Pressable style={[styles.sideItem, screen === 'home' && styles.sideItemActive]} onPress={() => go('home')}><Icon name="view-dashboard-outline" size={19} color={screen === 'home' ? navy : muted} /><Text style={styles.sideText}>Command Center</Text></Pressable>{navItems.map(([id, label, icon]) => <Pressable key={id} style={[styles.sideItem, screen === id && styles.sideItemActive]} onPress={() => go(id)}><Icon name={icon as any} size={19} color={screen === id ? navy : muted} /><Text style={styles.sideText}>{label}</Text></Pressable>)}<View style={styles.demoBadge}><Icon name="information-outline" size={16} color={gold} /><Text style={styles.demoText}>DEMO WORKSPACE{`\n`}Seeded Dubai intelligence</Text></View></View>; }
-
-function Home({ setModal, go }: { setModal: (s: string) => void; go: (s: string) => void }) { return <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}><View style={styles.greetingRow}><View><Text style={styles.greeting}>Good morning, Dhruv.</Text><Text style={styles.subGreeting}>Here’s what’s happening with your business today.</Text></View><View style={styles.period}><Text style={styles.periodActive}>Day</Text><Text>Week</Text><Text>Month</Text></View></View><View style={styles.dateRow}><Icon name="calendar-blank-outline" size={16} color={muted} /><Text style={styles.date}>Tuesday, 18 June 2024</Text><View style={styles.liveDot} /><Text style={styles.simulated}>SIMULATED DATA</Text></View><View style={styles.metricGrid}>{metrics.map((m) => <View key={m.label} style={styles.metric}><View style={[styles.metricIcon, { backgroundColor: m.tone === 'gold' ? '#F8F1E8' : m.tone === 'green' ? '#ECFDF5' : m.tone === 'orange' ? '#FFF7ED' : '#EFF6FF' }]}><Icon name={m.icon as any} size={19} color={m.tone === 'gold' ? '#A47736' : m.tone === 'green' ? '#059669' : m.tone === 'orange' ? '#D97706' : '#2563EB'} /></View><Text style={styles.metricLabel}>{m.label}</Text><Text style={styles.metricValue}>{m.value}</Text><Text style={styles.metricChange}>{m.change}</Text></View>)}</View><SectionTitle title="Your priority today" action="View all" /><View style={styles.priorityGrid}>{priorities.map((p) => <Pressable key={p.id} testID={`priority-${p.id}`} onPress={() => setModal(p.id)} style={styles.priorityCard}><View style={styles.cardTop}><View style={styles.personCircle}><Text style={styles.personInitial}>{p.name.split(' ').map((x) => x[0]).join('')}</Text></View><View style={{ flex: 1 }}><Text style={styles.personName}>{p.name}</Text><Text style={styles.personState}>{p.state}</Text></View><Icon name="dots-horizontal" size={20} color="#94A3B8" /></View><Text style={styles.priorityDetail}>{p.detail}</Text><View style={styles.metaRow}><Text style={styles.metaLabel}>Budget</Text><Text style={styles.metaValue}>{p.budget}</Text><Text style={styles.metaLabel}>Last contact</Text><Text style={styles.metaValue}>{p.time}</Text></View><View style={styles.recommend}><Icon name="sparkles" size={16} color={gold} /><Text style={styles.recommendText}>{p.action}</Text></View><View style={styles.cardFooter}><Text style={styles.why}>Why this matters <Icon name="arrow-right" size={13} color={muted} /></Text><Icon name={p.icon as any} size={19} color={navy} /></View></Pressable>)}</View><View style={styles.twoCol}><View style={styles.panel}><SectionTitle title="Pipeline overview" action="Open pipeline" onPress={() => go('leads')} /><View style={styles.pipeline}><Text style={styles.pipelineAmount}>AED 8.42M</Text><Text style={styles.pipelineCaption}>Value in active pipeline · +9.2%</Text><View style={styles.bars}>{['New', 'Contacted', 'Qualified', 'Viewing', 'Offer', 'Negotiation'].map((x, i) => <View key={x} style={styles.barCol}><View style={[styles.bar, { height: 25 + i * 10, backgroundColor: i > 3 ? gold : '#CBD5E1' }]} /><Text style={styles.barLabel}>{x}</Text></View>)}</View></View></View><View style={styles.panel}><SectionTitle title="Today’s schedule" action="Add task" onPress={() => setModal('task')} /><Schedule time="10:00 AM" title="Viewing — Dubai Marina" person="Sarah Khan" color="#C5A880" /><Schedule time="12:30 PM" title="Client call — Off-plan" person="Ahmed Rahman" color="#3B82F6" /><Schedule time="3:00 PM" title="Sales team meeting" person="Team room" color="#94A3B8" /><Schedule time="5:30 PM" title="Follow-up — James Wilson" person="Seller update" color="#F59E0B" /></View></View><View style={styles.market}><View><Text style={styles.sectionEyebrow}>DUBAI MARKET SNAPSHOT</Text><Text style={styles.marketTitle}>Where attention is moving</Text><Text style={styles.marketText}>Dubai Marina is leading area activity with transaction volume up 8.6% this month.</Text></View><View style={styles.marketStats}><Text style={styles.marketNumber}>AED 1,485</Text><Text style={styles.marketLabel}>avg / sq ft</Text><Text style={styles.marketNumber}>+8.6%</Text><Text style={styles.marketLabel}>price movement</Text></View></View></ScrollView>; }
-
-function SectionTitle({ title, action, onPress }: { title: string; action?: string; onPress?: () => void }) { return <View style={styles.sectionTitle}><Text style={styles.sectionHeading}>{title}</Text>{action && <Pressable onPress={onPress}><Text style={styles.link}>{action} <Icon name="arrow-right" size={13} color="#2563EB" /></Text></Pressable>}</View>; }
-function Schedule({ time, title, person, color }: { time: string; title: string; person: string; color: string }) { return <View style={styles.schedule}><View style={[styles.scheduleLine, { backgroundColor: color }]} /><View style={{ flex: 1 }}><Text style={styles.scheduleTime}>{time}</Text><Text style={styles.scheduleTitle}>{title}</Text><Text style={styles.schedulePerson}>{person}</Text></View><Icon name="chevron-right" size={20} color="#CBD5E1" /></View>; }
-
-function Leads({ setModal }: { setModal: (s: string) => void }) { return <ScrollView contentContainerStyle={styles.content}><View style={styles.pageIntro}><View><Text style={styles.greeting}>Lead intelligence</Text><Text style={styles.subGreeting}>Move the right relationship forward, not just more records.</Text></View><Pressable style={styles.primaryButtonSmall} onPress={() => setModal('new lead')}><Icon name="plus" size={18} color="#fff" /><Text style={styles.primaryText}>New lead</Text></Pressable></View><View style={styles.leadStats}><View><Text style={styles.bigStat}>47</Text><Text style={styles.statCaption}>Total leads</Text></View><View><Text style={styles.bigStat}>68%</Text><Text style={styles.statCaption}>Conversion rate</Text></View><View><Text style={styles.bigStat}>18m</Text><Text style={styles.statCaption}>Avg response</Text></View><View><Text style={styles.bigStat}>7</Text><Text style={styles.statCaption}>Need follow-up</Text></View></View><View style={styles.tabRow}><Text style={styles.tabActive}>Priority view</Text><Text>Kanban</Text><Text>List</Text><Text>Analytics</Text></View><View style={styles.leadCard}><View style={styles.cardTop}><View style={styles.personCircle}><Text style={styles.personInitial}>SK</Text></View><View style={{ flex: 1 }}><Text style={styles.personName}>Sarah Khan</Text><Text style={styles.personState}>High Intent · Score 87/100</Text></View><Text style={styles.score}>87</Text></View><View style={styles.scoreBar}><View style={{ width: '87%', height: 6, backgroundColor: '#C5A880', borderRadius: 8 }} /></View><Text style={styles.leadReasonTitle}>Why SAI scored this lead</Text>{['Viewed 3 properties', 'Increased budget from AED 2.1M to AED 2.4M', 'Asked about mortgage eligibility', 'No viewing booked yet'].map((x, i) => <View style={styles.reasonRow} key={x}><Icon name={i === 3 ? 'minus-circle-outline' : 'check-circle-outline'} size={17} color={i === 3 ? '#F59E0B' : '#10B981'} /><Text style={styles.reasonText}>{x}</Text></View>)}<Pressable style={styles.outlineButton} onPress={() => setModal('sarah')}><Text style={styles.outlineText}>Open Client 360</Text><Icon name="arrow-right" size={16} color={navy} /></Pressable></View><Text style={styles.sectionEyebrow}>PIPELINE STAGES</Text><View style={styles.stageGrid}>{['New', 'Contacted', 'Qualified', 'Viewing', 'Offer', 'Negotiation', 'Closed'].map((x, i) => <View key={x} style={styles.stage}><Text style={styles.stageCount}>{[8, 11, 7, 6, 4, 3, 8][i]}</Text><Text style={styles.stageName}>{x}</Text><View style={{ height: 4, backgroundColor: i === 4 ? gold : '#DBEAFE', width: '100%', marginTop: 10, borderRadius: 4 }} /></View>)}</View></ScrollView>; }
-
-function Inbox({ setModal }: { setModal: (s: string) => void }) { return <ScrollView contentContainerStyle={styles.content}><View style={styles.pageIntro}><View><Text style={styles.greeting}>Conversations with context</Text><Text style={styles.subGreeting}>DEMO INBOX · Messages are simulated for this prototype.</Text></View><Pressable style={styles.primaryButtonSmall} onPress={() => setModal('message')}><Icon name="pencil-outline" size={17} color="#fff" /><Text style={styles.primaryText}>Draft message</Text></Pressable></View><View style={styles.inboxTabs}><Text style={styles.tabActive}>All 12</Text><Text>WhatsApp 6</Text><Text>Email 3</Text><Text>Coming soon</Text></View>{[['Sarah Khan', 'I like Marina Gate but I’m worried about service charges.', '2 min ago', 'SK', true], ['Ahmed Rahman', 'Do you have any off-plan options with a flexible plan?', '15 min ago', 'AR', false], ['James Wilson', 'Please share the documents.', '45 min ago', 'JW', false], ['Fatima Ali', 'When is the next viewing?', '1 hr ago', 'FA', false]].map((x: any) => <Pressable key={x[0]} style={styles.messageCard} onPress={() => setModal(x[0] === 'Sarah Khan' ? 'sarah message' : 'message')}><View style={styles.personCircle}><Text style={styles.personInitial}>{x[3]}</Text></View><View style={{ flex: 1 }}><View style={styles.cardTop}><Text style={styles.personName}>{x[0]}</Text><Text style={styles.messageTime}>{x[2]}</Text></View><Text style={styles.messageText}>{x[1]}</Text>{x[4] && <View style={styles.aiTag}><Icon name="sparkles" size={13} color={gold} /><Text style={styles.aiTagText}>Concern detected · service charges</Text></View>}</View><Icon name="chevron-right" size={20} color="#CBD5E1" /></Pressable>)}</ScrollView>; }
-
-function More({ go, setModal }: { go: (s: string) => void; setModal: (s: string) => void }) { return <ScrollView contentContainerStyle={styles.content}><Text style={styles.greeting}>Workspace</Text><Text style={styles.subGreeting}>Every module is designed to turn information into the next action.</Text><Pressable style={styles.saiBanner} onPress={() => setModal('ask')}><View style={styles.saiIcon}><Icon name="sparkles" size={22} color={gold} /></View><View style={{ flex: 1 }}><Text style={styles.saiTitle}>Ask SAI anything</Text><Text style={styles.saiSub}>Find matches, explain scores, surface risks.</Text></View><Icon name="arrow-right" size={20} color="#fff" /></Pressable><View style={styles.moduleGrid}>{navItems.map(([id, label, icon]) => <Pressable key={id} style={styles.moduleCard} onPress={() => go(id)}><View style={styles.moduleIcon}><Icon name={icon as any} size={22} color={navy} /></View><Text style={styles.moduleLabel}>{label}</Text><Text style={styles.moduleStatus}>{['integrations', 'compliance'].includes(id) ? 'DEMO / COMING SOON' : 'Open workspace'}</Text></Pressable>)}</View></ScrollView>; }
-
-function Module({ title, setModal }: { title: string; setModal: (s: string) => void }) { const isOff = title.includes('Off-Plan'); const isDeal = title.includes('Deals'); return <ScrollView contentContainerStyle={styles.content}><View style={styles.pageIntro}><View><Text style={styles.greeting}>{title}</Text><Text style={styles.subGreeting}>{isOff ? 'Match investment intent to projects, payment plans and a clear recommendation.' : isDeal ? 'Proactive transaction visibility with risks surfaced before they become delays.' : 'A focused workspace for the next best action.'}</Text></View><View style={styles.demoPill}><View style={styles.liveDot} /><Text>DEMO DATA</Text></View></View>{isOff ? <><View style={styles.clientContext}><Text style={styles.sectionEyebrow}>CLIENT CONTEXT</Text><Text style={styles.clientContextTitle}>Ahmed Rahman · Investor</Text><Text style={styles.clientContextText}>AED 1.8M budget · 5-year holding period · Dubai Hills / Downtown</Text></View><SectionTitle title="Recommended projects" action="Compare selected" />{projects.map((p) => <Pressable key={p.name} style={styles.projectCard} onPress={() => setModal('ahmed')}><View style={styles.projectHead}><View style={{ flex: 1 }}><Text style={styles.projectName}>{p.name}</Text><Text style={styles.projectArea}>{p.area} · {p.completion}</Text></View><Text style={styles.match}>{p.match}%</Text></View><View style={styles.projectRow}><Text style={styles.projectPrice}>{p.price}</Text><Text style={styles.plan}>{p.plan} payment plan</Text></View><Text style={styles.projectReason}>{p.reason}</Text></Pressable>)}</> : isDeal ? <DealPanel setModal={setModal} /> : <GenericPanel title={title} setModal={setModal} />}</ScrollView>; }
-function DealPanel({ setModal }: { setModal: (s: string) => void }) { return <><View style={styles.dealHero}><View style={styles.cardTop}><View><Text style={styles.sectionEyebrow}>ACTIVE DEAL · SARAH KHAN</Text><Text style={styles.dealTitle}>Marina Gate · Apt 2503</Text><Text style={styles.dealPrice}>AED 2,320,000</Text></View><Text style={styles.dealStage}>OFFER</Text></View><View style={styles.dealSteps}>{['Lead', 'Qualified', 'Viewing', 'Offer', 'Contract', 'Completed'].map((x, i) => <View key={x} style={styles.dealStep}><View style={[styles.stepDot, i <= 3 && styles.stepDotActive]} /><Text style={styles.stepText}>{x}</Text></View>)}</View></View><View style={styles.risk}><Icon name="alert-circle-outline" size={24} color="#B45309" /><View style={{ flex: 1 }}><Text style={styles.riskTitle}>Potential delay detected</Text><Text style={styles.riskText}>Mortgage approval has not been uploaded. Request an update from Sarah before the contract deadline.</Text></View><Pressable onPress={() => setModal('request')}><Text style={styles.link}>Request</Text></Pressable></View><SectionTitle title="Deal checklist" action="Add item" /><View style={styles.checklist}>{['Buyer documents', 'Seller documents', 'Offer', 'MOU', 'Mortgage approval', 'Transfer'].map((x, i) => <View style={styles.checkRow} key={x}><Icon name={i === 4 ? 'alert-circle-outline' : i < 3 ? 'check-circle' : 'circle-outline'} size={21} color={i === 4 ? '#F59E0B' : i < 3 ? '#10B981' : '#CBD5E1'} /><Text style={[styles.checkText, i === 4 && { color: '#B45309' }]}>{x}</Text><Text style={styles.checkStatus}>{i < 3 ? 'Complete' : i === 4 ? 'Missing' : 'Pending'}</Text></View>)}</View></>; }
-function GenericPanel({ title, setModal }: { title: string; setModal: (s: string) => void }) { return <><View style={styles.emptyPanel}><Icon name="view-grid-plus-outline" size={32} color={gold} /><Text style={styles.emptyTitle}>Built for the next decision</Text><Text style={styles.emptyText}>This {title.toLowerCase()} workspace is ready for your operating rhythm. Explore the seeded demo or ask SAI for an actionable summary.</Text><Pressable style={styles.primaryButton} onPress={() => setModal('ask')}><Icon name="sparkles" size={18} color="#fff" /><Text style={styles.primaryText}>Ask SAI about {title}</Text></Pressable></View><View style={styles.statusList}>{['All records connected', 'AI recommendations ready', 'External integrations marked clearly'].map((x) => <View style={styles.statusRow} key={x}><Icon name="check-circle-outline" size={19} color="#10B981" /><Text>{x}</Text></View>)}</View></>; }
-
-function ActionModal({ type, close }: { type: string; close: () => void }) { const sarah = type.includes('sarah'); const ahmed = type.includes('ahmed'); return <><View style={styles.modalTitleRow}><View><Text style={styles.eyebrow}>{ahmed ? 'OFF-PLAN INTELLIGENCE' : sarah ? 'CLIENT 360 · HIGH INTENT' : 'QUICK ACTION'}</Text><Text style={styles.modalTitle}>{ahmed ? 'Ahmed Rahman' : sarah ? 'Sarah Khan' : type[0].toUpperCase() + type.slice(1)}</Text></View><Close onPress={close} /></View>{sarah ? <><Text style={styles.modalSub}>Buyer · Dubai Marina · AED 2.4M · 2BR+ · Balcony · Mortgage</Text><View style={styles.modalSection}><Text style={styles.leadReasonTitle}>SAI recommendation</Text><Text style={styles.modalBody}>Send Sarah the Marina Vista and LIV Marina comparison, then schedule a viewing. Her concern about service charges should be addressed before the call.</Text></View><View style={styles.actionStack}><Pressable style={styles.primaryButton} onPress={() => close()}><Icon name="home-search-outline" size={18} color="#fff" /><Text style={styles.primaryText}>Find property matches</Text></Pressable><Pressable style={styles.outlineButton} onPress={() => close()}><Text style={styles.outlineText}>Schedule viewing</Text><Icon name="calendar-plus" size={17} color={navy} /></Pressable><Pressable style={styles.outlineButton} onPress={() => close()}><Text style={styles.outlineText}>Convert to deal</Text><Icon name="arrow-right" size={17} color={navy} /></Pressable></View></> : ahmed ? <><Text style={styles.modalSub}>Investor · AED 1.8M · Dubai Hills / Downtown · 5-year hold</Text><View style={styles.answer}><Icon name="chart-line" size={22} color={gold} /><Text style={styles.answerText}>Sobha Hartland II is the strongest match at 92%. The 20/40/40 plan means AED 336K booking, AED 672K construction and AED 672K completion.</Text></View><Pressable style={styles.primaryButton} onPress={close}><Icon name="message-text-outline" size={18} color="#fff" /><Text style={styles.primaryText}>Draft Ahmed follow-up</Text></Pressable></> : <><Text style={styles.modalSub}>This action is available in the demo workspace.</Text><TextInput placeholder="Add a note or message" placeholderTextColor="#94A3B8" style={styles.input} /><Pressable style={styles.primaryButton} onPress={close}><Text style={styles.primaryText}>Save demo action</Text></Pressable></>}</>; }
-function Close({ onPress }: { onPress: () => void }) { return <Pressable testID="close-modal" onPress={onPress} style={styles.close}><Icon name="close" size={21} color={muted} /></Pressable>; }
-function BottomNav({ screen, go, onAdd }: { screen: string; go: (s: string) => void; onAdd: () => void }) { return <View style={styles.bottomNav}><Pressable onPress={() => go('home')} style={styles.navButton}><Icon name="view-dashboard-outline" size={21} color={screen === 'home' ? navy : muted} /><Text style={[styles.navLabel, screen === 'home' && styles.navLabelActive]}>Home</Text></Pressable><Pressable onPress={() => go('leads')} style={styles.navButton}><Icon name="account-group-outline" size={21} color={screen === 'leads' ? navy : muted} /><Text style={[styles.navLabel, screen === 'leads' && styles.navLabelActive]}>Leads</Text></Pressable><Pressable testID="add-button" onPress={onAdd} style={styles.addButton}><Icon name="plus" size={25} color="#fff" /></Pressable><Pressable onPress={() => go('inbox')} style={styles.navButton}><Icon name="message-text-outline" size={21} color={screen === 'inbox' ? navy : muted} /><Text style={[styles.navLabel, screen === 'inbox' && styles.navLabelActive]}>Inbox</Text></Pressable><Pressable onPress={() => go('more')} style={styles.navButton}><Icon name="dots-grid" size={21} color={screen === 'more' ? navy : muted} /><Text style={[styles.navLabel, screen === 'more' && styles.navLabelActive]}>More</Text></Pressable></View>; }
-
 const styles = StyleSheet.create({
-  safe:{flex:1,backgroundColor:'#F8FAFC'},appShell:{flex:1,flexDirection:'row'},main:{flex:1},sidebar:{width:250,backgroundColor:'#fff',borderRightWidth:1,borderRightColor:line,padding:22,paddingTop:32},brand:{flexDirection:'row',alignItems:'center',gap:10,marginBottom:32},brandMark:{width:36,height:36,borderRadius:11,backgroundColor:navy,alignItems:'center',justifyContent:'center'},brandMarkText:{color:gold,fontSize:22,fontWeight:'800'},brandName:{fontSize:22,fontWeight:'800',color:navy,letterSpacing:2},brandTag:{fontSize:7,color:muted,letterSpacing:1},menuLabel:{fontSize:10,color:'#94A3B8',letterSpacing:1.5,marginBottom:10},sideItem:{flexDirection:'row',alignItems:'center',gap:12,padding:10,borderRadius:9},sideItemActive:{backgroundColor:'#F1F5F9'},sideText:{color:'#475569',fontSize:12,fontWeight:'600'},demoBadge:{marginTop:24,padding:12,borderRadius:12,backgroundColor:'#FEFBF6',flexDirection:'row',gap:8},demoText:{color:'#8A6A39',fontSize:10,lineHeight:15},header:{height:86,borderBottomWidth:1,borderBottomColor:line,backgroundColor:'#fff',flexDirection:'row',justifyContent:'space-between',alignItems:'center',paddingHorizontal:28},headerKicker:{fontSize:9,color:gold,fontWeight:'800',letterSpacing:1.5},headerTitle:{color:ink,fontSize:23,fontWeight:'800',marginTop:4},headerActions:{flexDirection:'row',alignItems:'center',gap:14},askButton:{minHeight:44,borderWidth:1,borderColor:'#D6C3A8',borderRadius:9,paddingHorizontal:13,flexDirection:'row',alignItems:'center',gap:7,backgroundColor:'#FFFCF8'},askText:{color:navy,fontWeight:'800',fontSize:13},avatar:{width:37,height:37,borderRadius:19,backgroundColor:navy,alignItems:'center',justifyContent:'center'},avatarText:{color:'#fff',fontSize:12,fontWeight:'800'},content:{padding:28,paddingBottom:50,maxWidth:1400,width:'100%',alignSelf:'center'},greetingRow:{flexDirection:'row',justifyContent:'space-between',alignItems:'flex-end'},greeting:{fontSize:27,fontWeight:'800',color:ink},subGreeting:{fontSize:14,color:muted,marginTop:6},dateRow:{flexDirection:'row',alignItems:'center',gap:7,marginTop:18,marginBottom:20},date:{color:muted,fontSize:12},liveDot:{width:7,height:7,borderRadius:5,backgroundColor:'#10B981',marginLeft:8},simulated:{fontSize:9,color:'#059669',fontWeight:'800',letterSpacing:1},period:{flexDirection:'row',borderWidth:1,borderColor:line,borderRadius:8,padding:3,gap:3},periodActive:{backgroundColor:navy,color:'#fff',borderRadius:6,paddingHorizontal:10,paddingVertical:7},metricGrid:{flexDirection:'row',flexWrap:'wrap',gap:12,marginBottom:28},metric:{flex:1,minWidth:145,backgroundColor:'#fff',borderRadius:13,padding:16,borderWidth:1,borderColor:line},metricIcon:{width:35,height:35,borderRadius:10,alignItems:'center',justifyContent:'center',marginBottom:10},metricLabel:{fontSize:11,color:muted},metricValue:{fontSize:23,color:ink,fontWeight:'800',marginTop:4},metricChange:{color:'#059669',fontSize:11,fontWeight:'700',marginTop:3},sectionTitle:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:13},sectionHeading:{fontSize:17,color:ink,fontWeight:'800'},link:{color:'#2563EB',fontWeight:'700',fontSize:12},priorityGrid:{flexDirection:'row',flexWrap:'wrap',gap:13,marginBottom:28},priorityCard:{flex:1,minWidth:245,backgroundColor:'#fff',padding:16,borderRadius:13,borderWidth:1,borderColor:line},cardTop:{flexDirection:'row',alignItems:'center',gap:9},personCircle:{width:35,height:35,borderRadius:18,backgroundColor:'#E8EEF7',alignItems:'center',justifyContent:'center'},personInitial:{color:navy,fontSize:11,fontWeight:'800'},personName:{fontSize:14,fontWeight:'800',color:ink},personState:{fontSize:11,color:'#B07F36',marginTop:3},priorityDetail:{color:'#475569',fontSize:12,marginVertical:12},metaRow:{flexDirection:'row',flexWrap:'wrap',gap:5,borderTopWidth:1,borderTopColor:'#F1F5F9',paddingTop:10},metaLabel:{color:'#94A3B8',fontSize:10},metaValue:{color:ink,fontSize:10,fontWeight:'700',marginRight:8},recommend:{backgroundColor:'#FFFBF5',padding:10,borderRadius:8,flexDirection:'row',gap:7,marginTop:12},recommendText:{color:'#8A6A39',fontSize:11,fontWeight:'700',flex:1},cardFooter:{borderTopWidth:1,borderTopColor:'#F1F5F9',marginTop:12,paddingTop:11,flexDirection:'row',justifyContent:'space-between'},why:{color:muted,fontSize:11},twoCol:{flexDirection:'row',flexWrap:'wrap',gap:14},panel:{flex:1,minWidth:290,backgroundColor:'#fff',borderRadius:13,borderWidth:1,borderColor:line,padding:17,marginBottom:14},pipelineAmount:{color:ink,fontSize:24,fontWeight:'800'},pipelineCaption:{color:muted,fontSize:11},bars:{height:135,flexDirection:'row',alignItems:'flex-end',justifyContent:'space-around'},barCol:{alignItems:'center',flex:1},bar:{width:18,borderRadius:5},barLabel:{color:muted,fontSize:8,marginTop:7},schedule:{flexDirection:'row',alignItems:'center',gap:10,paddingVertical:8,borderBottomWidth:1,borderBottomColor:'#F1F5F9'},scheduleLine:{width:3,height:35,borderRadius:3},scheduleTime:{color:muted,fontSize:10},scheduleTitle:{color:ink,fontSize:12,fontWeight:'700'},schedulePerson:{color:'#94A3B8',fontSize:10},market:{backgroundColor:navy,borderRadius:14,padding:21,flexDirection:'row',justifyContent:'space-between'},sectionEyebrow:{fontSize:10,color:gold,letterSpacing:1.3,fontWeight:'800'},marketTitle:{color:'#fff',fontSize:19,fontWeight:'800',marginTop:7},marketText:{color:'#CBD5E1',fontSize:12,marginTop:6,maxWidth:450},marketStats:{flexDirection:'row',gap:8,alignItems:'center',flexWrap:'wrap',maxWidth:220},marketNumber:{color:gold,fontWeight:'800',fontSize:17},marketLabel:{color:'#CBD5E1',fontSize:10},pageIntro:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:22},primaryButtonSmall:{backgroundColor:navy,minHeight:44,borderRadius:9,paddingHorizontal:14,flexDirection:'row',alignItems:'center',gap:7},primaryButton:{backgroundColor:navy,minHeight:46,borderRadius:9,paddingHorizontal:16,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8,marginTop:14},primaryText:{color:'#fff',fontWeight:'800',fontSize:13},leadStats:{flexDirection:'row',flexWrap:'wrap',gap:28,backgroundColor:'#fff',borderWidth:1,borderColor:line,borderRadius:13,padding:19,marginBottom:22},bigStat:{fontSize:24,color:ink,fontWeight:'800'},statCaption:{fontSize:11,color:muted,marginTop:3},tabRow:{flexDirection:'row',gap:24,borderBottomWidth:1,borderBottomColor:line,paddingBottom:12,marginBottom:17},tabActive:{color:navy,fontWeight:'800',borderBottomWidth:2,borderBottomColor:gold,paddingBottom:11},leadCard:{backgroundColor:'#fff',borderWidth:1,borderColor:line,borderRadius:13,padding:19,maxWidth:620,marginBottom:25},score:{color:'#A47736',fontSize:25,fontWeight:'800'},scoreBar:{height:6,backgroundColor:'#F1F5F9',borderRadius:8,marginVertical:16},leadReasonTitle:{color:ink,fontSize:12,fontWeight:'800',marginBottom:8},reasonRow:{flexDirection:'row',gap:8,alignItems:'center',paddingVertical:5},reasonText:{color:'#475569',fontSize:12},outlineButton:{minHeight:44,borderWidth:1,borderColor:'#CBD5E1',borderRadius:9,paddingHorizontal:14,marginTop:14,flexDirection:'row',justifyContent:'center',alignItems:'center',gap:8},outlineText:{color:navy,fontWeight:'800',fontSize:12},stageGrid:{flexDirection:'row',flexWrap:'wrap',gap:9},stage:{backgroundColor:'#fff',borderWidth:1,borderColor:line,borderRadius:10,padding:12,minWidth:100,flex:1},stageCount:{fontSize:20,color:ink,fontWeight:'800'},stageName:{color:muted,fontSize:11,marginTop:4},inboxTabs:{flexDirection:'row',gap:20,paddingBottom:13,borderBottomWidth:1,borderBottomColor:line,marginBottom:15},messageCard:{flexDirection:'row',alignItems:'center',gap:11,padding:14,backgroundColor:'#fff',borderWidth:1,borderColor:line,borderRadius:12,marginBottom:9},messageTime:{color:'#94A3B8',fontSize:10},messageText:{color:'#475569',fontSize:12,marginTop:4},aiTag:{flexDirection:'row',alignItems:'center',gap:5,marginTop:7},aiTagText:{color:'#A47736',fontSize:10,fontWeight:'700'},saiBanner:{backgroundColor:navy,borderRadius:13,padding:18,flexDirection:'row',alignItems:'center',gap:12,marginVertical:23},saiIcon:{width:44,height:44,borderRadius:13,backgroundColor:'#28344B',alignItems:'center',justifyContent:'center'},saiTitle:{color:'#fff',fontWeight:'800',fontSize:15},saiSub:{color:'#CBD5E1',fontSize:11,marginTop:4},moduleGrid:{flexDirection:'row',flexWrap:'wrap',gap:11},moduleCard:{backgroundColor:'#fff',borderWidth:1,borderColor:line,borderRadius:12,padding:14,minWidth:140,flex:1},moduleIcon:{width:38,height:38,borderRadius:10,backgroundColor:'#F1F5F9',alignItems:'center',justifyContent:'center',marginBottom:10},moduleLabel:{color:ink,fontWeight:'800',fontSize:12},moduleStatus:{color:'#94A3B8',fontSize:9,marginTop:5},demoPill:{backgroundColor:'#ECFDF5',borderRadius:20,padding:9,flexDirection:'row',alignItems:'center',gap:5},clientContext:{backgroundColor:'#FFFBF5',borderWidth:1,borderColor:'#EFE2CE',borderRadius:13,padding:18,marginBottom:23},clientContextTitle:{color:ink,fontSize:18,fontWeight:'800',marginTop:7},clientContextText:{color:'#8A6A39',fontSize:12,marginTop:5},projectCard:{backgroundColor:'#fff',borderWidth:1,borderColor:line,borderRadius:13,padding:16,marginBottom:10},projectHead:{flexDirection:'row',alignItems:'center'},projectName:{color:ink,fontSize:15,fontWeight:'800'},projectArea:{color:muted,fontSize:11,marginTop:4},match:{color:'#059669',fontSize:21,fontWeight:'800'},projectRow:{flexDirection:'row',justifyContent:'space-between',marginTop:14},projectPrice:{color:ink,fontWeight:'800',fontSize:13},plan:{color:'#A47736',fontSize:11,fontWeight:'700'},projectReason:{color:'#475569',fontSize:12,lineHeight:18,marginTop:8},dealHero:{backgroundColor:navy,borderRadius:14,padding:20,marginBottom:14},dealTitle:{color:'#fff',fontSize:20,fontWeight:'800',marginTop:7},dealPrice:{color:gold,fontSize:15,fontWeight:'700',marginTop:5},dealStage:{color:gold,borderWidth:1,borderColor:gold,borderRadius:20,paddingHorizontal:10,paddingVertical:5,fontSize:10,fontWeight:'800'},dealSteps:{flexDirection:'row',justifyContent:'space-between',marginTop:28},dealStep:{alignItems:'center',flex:1},stepDot:{width:9,height:9,borderRadius:6,backgroundColor:'#475569',marginBottom:7},stepDotActive:{backgroundColor:gold},stepText:{fontSize:8,color:'#CBD5E1'},risk:{backgroundColor:'#FFF7ED',borderWidth:1,borderColor:'#FED7AA',borderRadius:12,padding:15,flexDirection:'row',alignItems:'center',gap:11,marginBottom:24},riskTitle:{color:'#9A3412',fontSize:13,fontWeight:'800'},riskText:{color:'#9A3412',fontSize:11,marginTop:4,lineHeight:16},checklist:{backgroundColor:'#fff',borderWidth:1,borderColor:line,borderRadius:12,padding:8,maxWidth:650},checkRow:{flexDirection:'row',alignItems:'center',gap:10,padding:12,borderBottomWidth:1,borderBottomColor:'#F1F5F9'},checkText:{color:ink,fontSize:13,flex:1},checkStatus:{color:muted,fontSize:11},emptyPanel:{backgroundColor:'#fff',borderWidth:1,borderColor:line,borderRadius:14,padding:35,alignItems:'center',maxWidth:600},emptyTitle:{color:ink,fontSize:20,fontWeight:'800',marginTop:13},emptyText:{color:muted,fontSize:13,lineHeight:20,textAlign:'center',maxWidth:420,marginTop:8},statusList:{marginTop:18,gap:13},statusRow:{flexDirection:'row',alignItems:'center',gap:9},modalBackdrop:{flex:1,backgroundColor:'rgba(15,23,42,0.48)',justifyContent:'flex-end'},modalCard:{backgroundColor:'#fff',borderTopLeftRadius:24,borderTopRightRadius:24,padding:24,paddingBottom:36},modalTitleRow:{flexDirection:'row',justifyContent:'space-between',alignItems:'flex-start'},eyebrow:{color:gold,fontSize:10,letterSpacing:1.4,fontWeight:'800'},modalTitle:{color:ink,fontSize:24,fontWeight:'800',marginTop:5},close:{width:40,height:40,borderRadius:20,backgroundColor:'#F1F5F9',alignItems:'center',justifyContent:'center'},modalSub:{color:muted,fontSize:13,lineHeight:19,marginTop:10},input:{height:48,borderWidth:1,borderColor:'#CBD5E1',borderRadius:9,paddingHorizontal:13,color:ink,marginTop:18},answer:{backgroundColor:'#FFFBF5',borderWidth:1,borderColor:'#EFE2CE',borderRadius:11,padding:14,flexDirection:'row',gap:10,marginTop:16,marginBottom:4},answerText:{color:'#684F2C',fontSize:13,lineHeight:19,flex:1},modalSection:{marginTop:20,backgroundColor:'#F8FAFC',borderRadius:11,padding:15},modalBody:{color:'#475569',fontSize:13,lineHeight:20,marginTop:8},actionStack:{gap:1},bottomNav:{height:72,backgroundColor:'#fff',borderTopWidth:1,borderTopColor:line,flexDirection:'row',justifyContent:'space-around',alignItems:'center',paddingHorizontal:10},navButton:{alignItems:'center',justifyContent:'center',minWidth:52,minHeight:52,gap:4},navLabel:{color:muted,fontSize:10},navLabelActive:{color:navy,fontWeight:'800'},addButton:{width:52,height:52,borderRadius:18,backgroundColor:navy,alignItems:'center',justifyContent:'center',marginTop:-23,borderWidth:4,borderColor:'#F8FAFC'}
+  safe: { flex: 1, backgroundColor: colors.bg },
+  body: { flex: 1, backgroundColor: colors.bg },
 });

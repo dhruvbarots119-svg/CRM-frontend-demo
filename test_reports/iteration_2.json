@@ -1,0 +1,38 @@
+{
+  "summary": "Phase 2 SAI regression on mobile viewport (390x844). Previous Ask SAI blocker (submit off-viewport) is FIXED — sheet now uses fullHeight + KeyboardAvoidingView + ScrollView; submit tappable and answer renders. Core flows verified: header (search/notifications/AskSAI/role switcher), bottom tabs, Command Center KPIs and priority list, Leads pipeline with 6 stages, Lead detail sheet with Client 360 + matches + stage buttons, Inbox with channel filters + converted badges, Global search returning grouped results (Leads/Tasks/Inbox), Notifications sheet, Admin dashboard (KPIs + revenue by agent + agent performance + Commission tool), Add Lead sheet fields fill, auto-assignment to lightest-load agent (Priya Menon) and toast/notification generated. Local persistence via AsyncStorage confirmed — after Create Lead, `sai:v1:leads` in localStorage contains the new record and it survives reload (the record just doesn't render in Agent view because it was auto-routed to another agent — this is by design). Deprecated RN Web props detected: `shadow*` and `props.pointerEvents`.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "AddMenu bottom sheet (quick-lead / quick-task / quick-property / quick-ask)", "issue": "Playwright reports the picker rows as 'outside of viewport' on some cold-open attempts even though getBoundingClientRect shows them at top=504/bottom=573 (in-frame). A JS-dispatched click works, but Playwright's force-click occasionally fails. Suggests a pointer-events / animation-timing race between the Modal opening and the child Pressables becoming hit-testable. On real mobile devices a quick double-tap may miss.", "testID": "quick-lead", "priority": "LOW"},
+      {"component": "Form fields in AddLeadSheet / AddPropertySheet / AddTaskSheet", "issue": "Only `input-name` and `create-lead` have testIDs. Phone/email/budget/bedrooms/area/notes fields have neither testID nor unique accessibility label — automated regression must fall back to placeholder matching.", "testID": "input-phone / input-email / input-budget / input-bedrooms / input-area / input-notes (missing)", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Header", "issues": ["'SMART AGENT INTELLIGENCE' tag is 7px which is well below the 11px minimum for readable body text — acceptable as a decorative brandTag but flagging for accessibility awareness."]}
+    ],
+    "react_native_issues": [
+      {"component": "Multiple components (Header, BottomTabs, and anywhere using shadow* styles)", "issue": "Console warning: '\"shadow*\" style props are deprecated. Use \"boxShadow\".' Migrate shadowColor/shadowOpacity/shadowRadius/shadowOffset to a single `boxShadow` string (RN Web SDK 53+ style contract). Reference: /app/frontend/src/components/BottomTabs.tsx around the `addBtn` style; /app/frontend/src/components/Header.tsx and any other shadow* usage."},
+      {"component": "Any component setting `pointerEvents` as a prop", "issue": "Console warning: 'props.pointerEvents is deprecated. Use style.pointerEvents'. Move `pointerEvents=\"...\"` from JSX props into `style={{ pointerEvents: ... }}`."}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Add testID props to all inputs in AddLeadSheet, AddPropertySheet, AddTaskSheet (phone/email/budget/bedrooms/area/notes/title/price/etc.) so future regression can fill by testID rather than fragile placeholder matching.",
+    "Investigate AddMenu tap race — the Modal Pressable rows sometimes need a ~200ms settle before automated clicks land. Consider disabling child pointer events until the sheet slide-in animation completes, or explicitly delaying the `onPick` fire until animation end.",
+    "Migrate shadow* style props to boxShadow to clear the RN Web deprecation warning.",
+    "Move `pointerEvents` from JSX props into `style.pointerEvents` for the same reason.",
+    "Optional: expose an in-app hint or a subtle badge that leads auto-assigned to other agents are visible under the Admin role — QA on Agent view initially mistook auto-assigned leads for 'lost' data."
+  ],
+  "critical_code_review_comments": [
+    "AsyncStorage-wrapped persistence relies on doubled JSON.stringify (once in AppContext.save, once in Storage.setItem). It happens to round-trip correctly because storage-base.retrieve does JSON.parse once and AppContext.load does JSON.parse again, but this is fragile — if a future refactor removes one of the two JSON.parse layers, all persistence will silently fall back to seed data. Consider consolidating: either storage.setItem takes raw values (no inner stringify) or AppContext.save stops wrapping.",
+    "Frontend .env uses EXPO_PUBLIC_BACKEND_URL while the platform contract references EXPO_BACKEND_URL. Currently harmless (backend-less app) but should be aligned before any future live-API work.",
+    "Many Pressable actions (More screen module cards, admin tool cards, task rows, message rows, priority lead rows on home) lack testIDs even though the design/testing contract requires testID on all interactive elements. This makes robust regression brittle."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only build, no APIs)", "frontend": "~95% — all critical flows verified; only cosmetic deprecation warnings + missing testIDs remain"},
+  "seed_data_creation": "During testing created 'TEST Persist Guy' and 'TEST John Doe' leads (auto-assigned to Priya Menon). Also converted the Rakesh Verma inbox message flow was attempted. Recommend main agent runs Reset demo once before manual QA to clear these test entries.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "App URL: https://sai-realtor.preview.emergentagent.com. Mobile viewport 390x844. Header exposes role-agent/role-admin/header-search/header-notifications/header-ask-sai. Tabs: tab-home/tab-leads/tab-add/tab-inbox/tab-more. AddMenu opens on tab-add tap with testIDs quick-lead/quick-task/quick-property/quick-ask — use element.click() via evaluate if force-click reports 'outside of viewport'. Persistence uses localStorage keys sai:v1:leads / :agents / :properties / :tasks / :messages / :notifications / :role / :currentAgentId. Agent view filters leads by currentAgentId=agent-dhruv (2 leads); Admin view shows all 7+ leads. AsyncStorage double-stringify quirk is real but round-trips correctly today.",
+  "rca_of_issue": "Previous iteration flagged Ask SAI submit as unreachable at 390x844. Root cause was BottomSheet maxHeight:88% with no scroll on the modal card. Current build now wraps children in a ScrollView + KeyboardAvoidingView and AskSaiSheet passes fullHeight (maxHeight:95%). Verified: [data-testid=ask-submit] is now inside the viewport after typing, click succeeds without a scroll-into-view fallback, and [data-testid=ask-answer] renders with the expected 'Priorities for today' payload. Previous blocker resolved."
+}

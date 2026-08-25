@@ -1,36 +1,160 @@
 {
-  "app_name": "SAI — Smart Agent Intelligence",
-  "app_type": "mobile_web_app / hybrid_fullstack mobile responsive PWA",
-  "design_context": "Dashboard & SaaS PropTech OS (Dubai Real Estate)",
-  "emotional_tone": "Authoritative, intelligent, precise, high-end luxury combined with elite operational clarity",
+  "app_name": "SAI Elite Real Estate CRM",
+  "personality": "1 iOS-Native Clean with Dubai-inspired Luxe Accents",
+  "personality_one_liner": "A high-performance luxury real estate CRM combining Apple-grade iOS minimalism with elite Dubai-inspired gold and pearl accents.",
+  "color": {
+    "surface": "#F9F8F6",
+    "onSurface": "#1C1C1E",
+    "surfaceSecondary": "#FFFFFF",
+    "onSurfaceSecondary": "#1C1C1E",
+    "surfaceTertiary": "#F0EFEA",
+    "onSurfaceTertiary": "#3A3A3C",
+    "surfaceInverse": "#111113",
+    "onSurfaceInverse": "#F9F8F6",
+    "brand": "#C5A059",
+    "brandPrimary": "#C5A059",
+    "onBrandPrimary": "#FFFFFF",
+    "brandSecondary": "#8C6D33",
+    "onBrandSecondary": "#FFFFFF",
+    "brandTertiary": "#F4EEDC",
+    "onBrandTertiary": "#5A4416",
+    "success": "#2E7D32",
+    "onSuccess": "#FFFFFF",
+    "warning": "#ED6C02",
+    "onWarning": "#FFFFFF",
+    "error": "#D32F2F",
+    "onError": "#FFFFFF",
+    "info": "#0288D1",
+    "onInfo": "#FFFFFF",
+    "border": "#E5E3DC",
+    "borderStrong": "#C5A059",
+    "divider": "#EFECE6"
+  },
   "typography": {
-    "headings": "Outfit, sans-serif",
-    "body": "Plus Jakarta Sans, sans-serif",
-    "mono": "JetBrains Mono, monospace"
+    "displayFontFamily": "Satoshi",
+    "textFontFamily": "Geist",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
   },
-  "colors": {
-    "primary": "#0F172A",
-    "secondary": "#3B82F6",
-    "accent": "#D97706",
-    "dubai_gold": "#C5A880",
-    "background_light": "#F8FAFC",
-    "background_dark": "#090D16",
-    "surface_card": "#FFFFFF",
-    "surface_card_dark": "#111827",
-    "border_subtle": "#E2E8F0",
-    "border_subtle_dark": "#1F2937",
-    "forbidden_colors": ["#7351B7", "#1B93A4"]
+  "spacing": {
+    "rule": "Generous touch spacing, clean padding, sticky lower-third primary actions with safe-area bottom clearance.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
   },
-  "image_urls": {
-    "dubai_skyline": "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?crop=entropy&cs=srgb&fm=jpg&q=85",
-    "executive_portrait": "https://images.unsplash.com/photo-1758518727984-17b37f2f0562?crop=entropy&cs=srgb&fm=jpg&q=85",
-    "luxury_interior": "https://images.unsplash.com/photo-1643376452350-97eadd2c417f?crop=entropy&cs=srgb&fm=jpg&q=85"
+  "radius_tokens": {
+    "sm": 6,
+    "md": 12,
+    "lg": 20,
+    "pill": 999
   },
-  "universal_guidelines": [
-    "NEVER use pure black #000000 for backgrounds; tint with deep cool slate #090D16",
-    "Include data-testid on all interactive and informational elements",
-    "Maintain high APCA contrast ratios on all cards and tables",
-    "Provide responsive mobile-first views with bottom navigation and desktop sidebar",
-    "Ensure deterministic interactive workflows for Sarah Khan and Ahmed Rahman"
-  ]
+  "shadow_tier": "1",
+  "navigation": "bottom_tabs",
+  "icon_set": "Ionicons",
+  "glassmorphism": {
+    "enabled": true,
+    "do's": [
+      "Use frosted glass on sticky headers and bottom tab bars",
+      "Apply translucent glass overlays on luxury property hero cards"
+    ],
+    "dont's": [
+      "Do not apply blur to form inputs or dense tabular data",
+      "Do not use low-contrast text on glass surfaces"
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Command Center & Dashboard",
+      "purpose": "Overview of today's key real estate metrics, lead pipeline funnel, active tasks, and quick role switcher between Agent and Admin.",
+      "states": {
+        "loading": "Centered minimalist gold spinner with branded typography",
+        "empty": "Illustration + 'No recent command center activities' + Refresh action",
+        "error": "Error banner + Retry button"
+      },
+      "layout": "Vertical scroll with safe area top, role switcher header, KPI metric cards, pipeline stage summary with vertical collapsible previews, quick action toolbar, and bottom tab bar."
+    },
+    {
+      "name": "Lead Management Pipeline",
+      "purpose": "Full lead CRM pipeline from New -> Contacted -> Site Visit -> Negotiation -> Closed Won/Lost with auto-assignment and stage checklists.",
+      "states": {
+        "loading": "Skeleton card placeholders",
+        "empty": "Illustration + 'No leads found in this stage' + 'Add Lead' CTA",
+        "error": "Failed to sync pipeline data + Retry CTA"
+      },
+      "layout": "Segmented stage selector at top, vertical collapsible stage cards with deal values, client badges, quick action row (Call, WhatsApp, Edit, Delete), and sticky Add Lead floating button."
+    },
+    {
+      "name": "Property Listings Catalog",
+      "purpose": "Full property CRUD with pricing, location, amenities, owner contact, status, and smart lead matching.",
+      "states": {
+        "loading": "Grid skeleton loaders",
+        "empty": "Illustration + 'No properties listed' + 'Add Property' primary CTA",
+        "error": "Error loading property catalog + Retry"
+      },
+      "layout": "Search bar with filter chips (Off-Plan, Ready, Villa, Penthouse), 2-column image cards with price tags, status badges, and lead match indicator."
+    },
+    {
+      "name": "Omnichannel Demo Inbox",
+      "purpose": "Simulated WhatsApp, Facebook, and Instagram lead messages with one-tap convert to lead workflow.",
+      "states": {
+        "loading": "Chat list skeleton",
+        "empty": "No unread messages + 'All caught up' state",
+        "error": "Connection error + Refresh"
+      },
+      "layout": "Inbox channel tabs (WhatsApp, FB, IG), message threads with preview snippets, unread badges, and prominent 'Convert to Lead' action button."
+    },
+    {
+      "name": "Tasks, Reminders & Tools",
+      "purpose": "Task management with priorities, due dates, overdue highlighting, admin assignment, commission calculator, cap rate tool, and CSV export.",
+      "states": {
+        "loading": "Task list skeleton rows",
+        "empty": "Checkmark illustration + 'All tasks completed' + 'Create Task'",
+        "error": "Failed to load tasks + Retry"
+      },
+      "layout": "Segmented tabs for Tasks, Commission Calculator, and Cap Rate Tool, task cards with priority flags, overdue highlights, and modal calculators."
+    },
+    {
+      "name": "Team, Admin & Analytics",
+      "purpose": "Admin performance tracking, agent leaderboards, response tracking, and revenue reporting.",
+      "states": {
+        "loading": "Analytics chart skeleton",
+        "empty": "No performance metrics available",
+        "error": "Failed to fetch analytics + Retry"
+      },
+      "layout": "Role-gated admin view, agent performance cards with conversion rates and flags, revenue summary charts, and CSV export triggers."
+    }
+  ],
+  "images": {
+    "hero_dubai_skyline": {
+      "url": "https://images.unsplash.com/photo-1531586024505-b040066c2d5b",
+      "dark": "https://images.unsplash.com/photo-1739900292622-a7f860175aad",
+      "alt": "Dubai luxury skyline at twilight"
+    },
+    "property_sample_1": {
+      "url": "https://images.unsplash.com/photo-1543579596-2c11997c7706",
+      "alt": "Modern luxury high-rise apartment"
+    }
+  },
+  "instructions_to_main_agent": "Implement a polished React Native Expo app with local persistence, Agent/Admin role switcher, full lead CRM pipeline (New, Contacted, Site Visit, Negotiation, Closed Won/Lost), property CRUD with lead matching, call logging, task management with overdue highlights, revenue calculators (commission, cap rate, cash flow), omnichannel demo inbox (WhatsApp, FB, IG) with 1-tap convert to lead, global search and notification center, and CSV export capabilities. Use clean iOS-native styling with Dubai-inspired gold and pearl accents."
 }
