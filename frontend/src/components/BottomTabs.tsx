@@ -1,17 +1,17 @@
-// Bottom tab navigation with a center Add action.
+// Bottom tabs — flat row with a small navy circular + button between Leads and Inbox.
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, fontSize, radius, spacing } from '@/src/theme';
+import { colors, spacing } from '@/src/theme';
 
 export type TabKey = 'home' | 'leads' | 'inbox' | 'more';
 
 const TABS: { key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { key: 'home', label: 'Home', icon: 'grid' },
-  { key: 'leads', label: 'Leads', icon: 'people' },
-  { key: 'inbox', label: 'Inbox', icon: 'chatbubbles' },
-  { key: 'more', label: 'More', icon: 'apps' },
+  { key: 'home', label: 'Home', icon: 'grid-outline' },
+  { key: 'leads', label: 'Leads', icon: 'people-outline' },
+  { key: 'inbox', label: 'Inbox', icon: 'chatbubble-outline' },
+  { key: 'more', label: 'More', icon: 'apps-outline' },
 ];
 
 export const BottomTabs: React.FC<{
@@ -21,13 +21,13 @@ export const BottomTabs: React.FC<{
 }> = ({ active, onNavigate, onAdd }) => {
   const insets = useSafeAreaInsets();
   return (
-    <View style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 8) }]} testID="bottom-tabs">
+    <View style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 4) }]} testID="bottom-tabs">
       <View style={styles.row}>
         {TABS.slice(0, 2).map((t) => (
           <TabItem key={t.key} tab={t} active={active === t.key} onPress={() => onNavigate(t.key)} />
         ))}
-        <Pressable testID="tab-add" onPress={onAdd} style={styles.addBtn}>
-          <Ionicons name="add" size={26} color={colors.onGold} />
+        <Pressable testID="tab-add" onPress={onAdd} style={styles.addBtn} hitSlop={4}>
+          <Ionicons name="add" size={24} color="#fff" />
         </Pressable>
         {TABS.slice(2).map((t) => (
           <TabItem key={t.key} tab={t} active={active === t.key} onPress={() => onNavigate(t.key)} />
@@ -48,7 +48,7 @@ const TabItem: React.FC<{
     style={styles.tab}
     hitSlop={6}
   >
-    <Ionicons name={tab.icon} size={20} color={active ? colors.text : colors.textSubtle} />
+    <Ionicons name={tab.icon} size={21} color={active ? colors.navy : colors.textMuted} />
     <Text style={[styles.label, active && styles.labelActive]}>{tab.label}</Text>
   </Pressable>
 );
@@ -57,7 +57,7 @@ const styles = StyleSheet.create({
   wrap: {
     backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: colors.divider,
+    borderTopColor: colors.border,
     paddingHorizontal: spacing.sm,
     paddingTop: 6,
   },
@@ -66,24 +66,21 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 48,
-    gap: 3,
+    minHeight: 52,
+    gap: 4,
   },
-  label: { fontSize: 10, color: colors.textSubtle, fontWeight: '600' },
-  labelActive: { color: colors.text, fontWeight: '800' },
+  label: { fontSize: 10, color: colors.textMuted, fontWeight: '600' },
+  labelActive: { color: colors.navy, fontWeight: '800' },
   addBtn: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.gold,
+    width: 46,
+    height: 46,
+    borderRadius: 15,
+    backgroundColor: colors.navy,
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: spacing.sm,
-    marginTop: -12,
-    shadowColor: colors.gold,
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
+    marginHorizontal: 6,
+    marginTop: -18,
+    borderWidth: 4,
+    borderColor: colors.bg,
   },
 });

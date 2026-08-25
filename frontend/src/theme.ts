@@ -1,30 +1,30 @@
 // SAI Elite Real Estate CRM — Design tokens
-// iOS-native minimalism + Dubai gold accents.
+// Editorial navy + gold palette on cool pearl surfaces.
 
 export const colors = {
-  bg: '#F9F8F6',
+  bg: '#F8FAFC',
   surface: '#FFFFFF',
-  surfaceElev: '#F0EFEA',
-  surfaceInverse: '#111113',
-  onSurfaceInverse: '#F9F8F6',
-  text: '#1C1C1E',
-  textMuted: '#6B6B70',
-  textSubtle: '#9C9CA2',
-  gold: '#C5A059',
-  goldDark: '#8C6D33',
-  goldSoft: '#F4EEDC',
+  surfaceElev: '#F1F5F9',
+  surfaceInverse: '#0F172A',
+  onSurfaceInverse: '#F8FAFC',
+  text: '#152238',
+  textMuted: '#64748B',
+  textSubtle: '#94A3B8',
+  gold: '#C5A880',
+  goldDark: '#8A6A39',
+  goldSoft: '#FFFBF5',
   onGold: '#FFFFFF',
-  success: '#2E7D32',
-  successSoft: '#E6F4E7',
-  warning: '#ED6C02',
-  warningSoft: '#FEF1E1',
-  error: '#D32F2F',
-  errorSoft: '#FDECEC',
-  info: '#0288D1',
-  infoSoft: '#E1F1FA',
-  border: '#E5E3DC',
-  borderStrong: '#C5A059',
-  divider: '#EFECE6',
+  success: '#059669',
+  successSoft: '#ECFDF5',
+  warning: '#D97706',
+  warningSoft: '#FFF7ED',
+  error: '#DC2626',
+  errorSoft: '#FEF2F2',
+  info: '#2563EB',
+  infoSoft: '#EFF6FF',
+  border: '#E2E8F0',
+  borderStrong: '#C5A880',
+  divider: '#F1F5F9',
   navy: '#0F172A',
 };
 
@@ -50,17 +50,17 @@ export const shadow = {
 };
 
 export const stageMeta: Record<string, { label: string; color: string; soft: string }> = {
-  New: { label: 'New', color: '#0288D1', soft: '#E1F1FA' },
+  New: { label: 'New', color: '#2563EB', soft: '#EFF6FF' },
   Contacted: { label: 'Contacted', color: '#7B4EDB', soft: '#EDE7FB' },
-  SiteVisit: { label: 'Site Visit', color: '#C5A059', soft: '#F4EEDC' },
-  Negotiation: { label: 'Negotiation', color: '#ED6C02', soft: '#FEF1E1' },
-  ClosedWon: { label: 'Closed Won', color: '#2E7D32', soft: '#E6F4E7' },
-  ClosedLost: { label: 'Closed Lost', color: '#8E8E93', soft: '#EEEEEE' },
+  SiteVisit: { label: 'Site Visit', color: '#C5A880', soft: '#FFFBF5' },
+  Negotiation: { label: 'Negotiation', color: '#D97706', soft: '#FFF7ED' },
+  ClosedWon: { label: 'Closed Won', color: '#059669', soft: '#ECFDF5' },
+  ClosedLost: { label: 'Closed Lost', color: '#94A3B8', soft: '#F1F5F9' },
 };
 
 export const priorityMeta: Record<string, { color: string; soft: string }> = {
-  Low: { color: '#6B6B70', soft: '#F0EFEA' },
-  Medium: { color: '#0288D1', soft: '#E1F1FA' },
-  High: { color: '#ED6C02', soft: '#FEF1E1' },
-  Urgent: { color: '#D32F2F', soft: '#FDECEC' },
+  Low: { color: '#64748B', soft: '#F1F5F9' },
+  Medium: { color: '#2563EB', soft: '#EFF6FF' },
+  High: { color: '#D97706', soft: '#FFF7ED' },
+  Urgent: { color: '#DC2626', soft: '#FEF2F2' },
 };
