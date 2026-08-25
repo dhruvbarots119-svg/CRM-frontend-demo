@@ -1,4 +1,4 @@
-// Domain types for the SAI CRM.
+// Domain types for the SERRA CRM.
 
 export type LeadStage =
   | 'New'
@@ -9,14 +9,15 @@ export type LeadStage =
   | 'ClosedLost';
 
 export type LeadSource =
-  | 'Property Finder'
-  | 'Bayut'
-  | 'Dubizzle'
+  | 'MagicBricks'
+  | '99acres'
+  | 'Housing.com'
   | 'Website'
   | 'Instagram'
   | 'WhatsApp'
   | 'Facebook'
   | 'Referral'
+  | 'Walk-in'
   | 'Manual';
 
 export type Intent = 'Buy' | 'Rent' | 'Invest';
@@ -29,6 +30,7 @@ export interface CallLog {
   outcome: CallOutcome;
   notes: string;
   agentId: string;
+  durationMinutes: number;
 }
 
 export interface Lead {
@@ -58,10 +60,12 @@ export interface Lead {
   followUpDueAt?: string;
   anniversaryAt?: string;
   concernFlag?: string;
+  // Derived, but persisted so admin dashboards read it cheaply.
+  talkTimeMinutes?: number;
 }
 
 export type PropertyStatus = 'Available' | 'Under Offer' | 'Sold' | 'Rented';
-export type PropertyType = 'Apartment' | 'Villa' | 'Penthouse' | 'Townhouse' | 'Off-Plan';
+export type PropertyType = 'Apartment' | 'Villa' | 'Penthouse' | 'Bungalow' | 'Plot' | 'New Launch';
 
 export interface Property {
   id: string;
@@ -86,7 +90,7 @@ export interface Property {
 
 export type TaskPriority = 'Low' | 'Medium' | 'High' | 'Urgent';
 export type TaskStatus = 'Pending' | 'Completed';
-export type TaskType = 'Follow-up' | 'Call' | 'Viewing' | 'Meeting' | 'Document' | 'Custom';
+export type TaskType = 'Follow-up' | 'Call' | 'Site Visit' | 'Meeting' | 'Document' | 'Custom';
 
 export interface Task {
   id: string;
@@ -107,6 +111,14 @@ export interface Task {
 
 export type MessageChannel = 'WhatsApp' | 'Facebook' | 'Instagram' | 'Email';
 
+export interface ChatMessage {
+  id: string;
+  direction: 'in' | 'out';
+  text: string;
+  at: string;
+  status?: 'sent' | 'delivered' | 'read';
+}
+
 export interface Message {
   id: string;
   channel: MessageChannel;
@@ -117,6 +129,7 @@ export interface Message {
   receivedAt: string;
   isRead: boolean;
   convertedToLeadId?: string;
+  thread: ChatMessage[];
 }
 
 export type Role = 'agent' | 'admin';
@@ -144,6 +157,14 @@ export interface AppNotification {
   leadId?: string;
 }
 
+export interface StickyNote {
+  id: string;
+  text: string;
+  color: 'gold' | 'blue' | 'green' | 'pink';
+  createdAt: string;
+  pinned?: boolean;
+}
+
 export interface AppState {
   role: Role;
   currentAgentId: string;
@@ -153,5 +174,6 @@ export interface AppState {
   tasks: Task[];
   messages: Message[];
   notifications: AppNotification[];
+  notes: StickyNote[];
   hydrated: boolean;
 }

@@ -253,10 +253,21 @@ const styles = StyleSheet.create({
 
 // Utility formatters used across screens.
 export const fmtAED = (n: number): string => {
-  if (!n) return 'AED 0';
-  if (n >= 1_000_000) return `AED ${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000) return `AED ${(n / 1_000).toFixed(0)}K`;
-  return `AED ${n.toLocaleString()}`;
+  // Indian Rupees format — Ahmedabad market.
+  if (!n) return '₹0';
+  if (n >= 10_000_000) return `₹${(n / 10_000_000).toFixed(2)} Cr`;
+  if (n >= 100_000) return `₹${(n / 100_000).toFixed(2)} L`;
+  return `₹${n.toLocaleString('en-IN')}`;
+};
+
+export const fmtINR = fmtAED;
+
+export const fmtDuration = (mins: number): string => {
+  if (!mins || mins <= 0) return '0m';
+  if (mins < 60) return `${Math.round(mins)}m`;
+  const h = Math.floor(mins / 60);
+  const m = Math.round(mins % 60);
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
 };
 
 export const fmtDate = (iso: string): string => {

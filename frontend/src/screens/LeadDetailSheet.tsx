@@ -6,7 +6,7 @@ import { colors, fontSize, radius, spacing, stageMeta } from '@/src/theme';
 import { useApp } from '@/src/store/AppContext';
 import { CallOutcome, Lead, LeadStage } from '@/src/store/types';
 import { BottomSheet } from '@/src/components/BottomSheet';
-import { Avatar, Chip, Divider, fmtAED, fmtDateTime, GhostButton, PrimaryButton, Row, Section, timeAgo } from '@/src/components/ui';
+import { Avatar, Chip, Divider, fmtAED, fmtDateTime, fmtDuration, GhostButton, PrimaryButton, Row, Section, timeAgo } from '@/src/components/ui';
 import { Field } from '@/src/components/Field';
 import { useToast } from '@/src/components/Toast';
 
@@ -24,6 +24,7 @@ export const LeadDetailSheet: React.FC<{
   const [logOpen, setLogOpen] = useState(false);
   const [logOutcome, setLogOutcome] = useState<CallOutcome>('Interested');
   const [logNotes, setLogNotes] = useState('');
+  const [logDuration, setLogDuration] = useState('');
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
@@ -72,8 +73,13 @@ export const LeadDetailSheet: React.FC<{
       toast.show('Add a note before saving.', 'warning');
       return;
     }
-    addCallLog(lead.id, { outcome: logOutcome, notes: logNotes });
+    addCallLog(lead.id, {
+      outcome: logOutcome,
+      notes: logNotes,
+      durationMinutes: Number(logDuration) || 0,
+    });
     setLogNotes('');
+    setLogDuration('');
     setLogOpen(false);
     toast.show('Call log saved.', 'success');
   };
@@ -249,7 +255,7 @@ export const LeadDetailSheet: React.FC<{
         </View>
       </Section>
 
-      <Section title={`Call log (${lead.callLogs.length})`}>
+      <Section title={`Call log (${lead.callLogs.length})${state.role === 'admin' ? ` · ${fmtDuration(lead.talkTimeMinutes || 0)} total` : ''}`}>
         {lead.callLogs.length === 0 ? (
           <View style={styles.emptyBlock}>
             <Text style={styles.emptyBlockText}>No calls logged yet.</Text>
@@ -259,7 +265,15 @@ export const LeadDetailSheet: React.FC<{
             {lead.callLogs.slice(0, 5).map((c) => (
               <View key={c.id} style={styles.logRow}>
                 <View style={styles.logHead}>
-                  <Chip label={c.outcome} small soft={colors.infoSoft} color={colors.info} />
+                  <Row gap={6}>
+                    <Chip label={c.outcome} small soft={colors.infoSoft} color={colors.info} />
+                    {c.durationMinutes ? (
+                      <View style={styles.logDur}>
+                        <Ionicons name="time-outline" size={11} color={colors.goldDark} />
+                        <Text style={styles.logDurText}>{fmtDuration(c.durationMinutes)}</Text>
+                      </View>
+                    ) : null}
+                  </Row>
                   <Text style={styles.logTime}>{fmtDateTime(c.at)}</Text>
                 </View>
                 <Text style={styles.logNotes}>{c.notes}</Text>
@@ -286,7 +300,15 @@ export const LeadDetailSheet: React.FC<{
               />
             ))}
           </View>
-          <Field label="Notes" value={logNotes} onChangeText={setLogNotes} multiline placeholder="What did you discuss?" />
+          <Field
+            label="Talk time (minutes)"
+            value={logDuration}
+            onChangeText={setLogDuration}
+            keyboardType="numeric"
+            placeholder="e.g. 8"
+            testID="log-duration"
+          />
+          <Field label="Notes" value={logNotes} onChangeText={setLogNotes} multiline placeholder="What did you discuss?" testID="log-notes" />
           <Row>
             <GhostButton label="Cancel" onPress={() => setLogOpen(false)} style={{ flex: 1 }} />
             <PrimaryButton label="Save log" onPress={submitLog} testID="save-log" style={{ flex: 1 }} />

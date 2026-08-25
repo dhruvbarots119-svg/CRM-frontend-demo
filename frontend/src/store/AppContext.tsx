@@ -6,17 +6,19 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { storage } from '@/src/utils/storage';
-import { seedAgents, seedLeads, seedMessages, seedNotifications, seedProperties, seedTasks } from './seed';
+import { seedAgents, seedLeads, seedMessages, seedNotes, seedNotifications, seedProperties, seedTasks } from './seed';
 import {
   Agent,
   AppNotification,
   AppState,
   CallLog,
+  ChatMessage,
   Lead,
   LeadStage,
   Message,
   Property,
   Role,
+  StickyNote,
   Task,
 } from './types';
 
@@ -29,6 +31,7 @@ const KEYS = {
   tasks: 'sai:v1:tasks',
   messages: 'sai:v1:messages',
   notifications: 'sai:v1:notifications',
+  notes: 'sai:v1:notes',
 } as const;
 
 const load = async <T,>(key: string, fallback: T): Promise<T> => {
@@ -71,12 +74,19 @@ type Ctx = {
 
   // Messages
   markMessageRead: (id: string) => void;
+  sendMessage: (messageId: string, text: string) => void;
   convertMessageToLead: (messageId: string) => Lead | null;
 
   // Notifications
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
   pushNotification: (n: Omit<AppNotification, 'id' | 'createdAt' | 'read'>) => void;
+
+  // Sticky notes
+  addNote: (text: string, color?: StickyNote['color']) => void;
+  updateNote: (id: string, patch: Partial<StickyNote>) => void;
+  deleteNote: (id: string) => void;
+  togglePinNote: (id: string) => void;
 
   // Helpers
   getMatchingProperties: (leadId: string) => Property[];
@@ -86,6 +96,23 @@ type Ctx = {
 const AppCtx = createContext<Ctx | null>(null);
 
 const uid = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
+
+// Deterministic auto-reply for the mocked chat interface — picks a plausible
+// response so agents can see the round-trip without a real backend.
+const pickReply = (outgoingText: string): string => {
+  const t = outgoingText.toLowerCase();
+  if (t.includes('site visit') || t.includes('visit') || t.includes('sunday') || t.includes('slot'))
+    return 'Sunday works! Please share the exact time and address.';
+  if (t.includes('price') || t.includes('budget') || t.includes('cr') || t.includes('lakh') || t.includes('₹'))
+    return 'Sounds good. Can you also share what the final all-in-cost would be, including stamp duty?';
+  if (t.includes('loan') || t.includes('emi') || t.includes('mortgage'))
+    return 'Great — I already have a pre-approval from HDFC. Please share the property paperwork.';
+  if (t.includes('brochure') || t.includes('deck') || t.includes('document') || t.includes('rera'))
+    return 'Received, thanks. I will review and revert in a few hours.';
+  if (t.includes('hi') || t.includes('hello') || t.includes('namaste'))
+    return 'Namaste 🙏 — glad you got back. Let me know when you have a moment.';
+  return 'Thanks, that helps! Let me think and revert.';
+};
 
 const CHECKLIST_TEMPLATE: Record<LeadStage, string[]> = {
   New: ['Verify contact', 'Log source', 'Send intro message'],
@@ -123,13 +150,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     tasks: seedTasks,
     messages: seedMessages,
     notifications: seedNotifications,
+    notes: seedNotes,
     hydrated: false,
   });
 
   // Hydrate from storage on mount.
   useEffect(() => {
     (async () => {
-      const [role, agentId, agents, leads, properties, tasks, messages, notifications] = await Promise.all([
+      const [role, agentId, agents, leads, properties, tasks, messages, notifications, notes] = await Promise.all([
         load<Role>(KEYS.role, 'agent'),
         load<string>(KEYS.currentAgentId, 'agent-dhruv'),
         load<Agent[]>(KEYS.agents, seedAgents),
@@ -138,6 +166,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         load<Task[]>(KEYS.tasks, seedTasks),
         load<Message[]>(KEYS.messages, seedMessages),
         load<AppNotification[]>(KEYS.notifications, seedNotifications),
+        load<StickyNote[]>(KEYS.notes, seedNotes),
       ]);
       setState({
         role,
@@ -148,6 +177,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         tasks: tasks.length ? tasks : seedTasks,
         messages: messages.length ? messages : seedMessages,
         notifications,
+        notes: notes.length ? notes : seedNotes,
         hydrated: true,
       });
     })();
@@ -169,6 +199,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     save(KEYS.tasks, state.tasks);
     save(KEYS.messages, state.messages);
     save(KEYS.notifications, state.notifications);
+    save(KEYS.notes, state.notes);
   }, [state]);
 
   const setRole = useCallback((role: Role) => {
@@ -222,6 +253,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         callLogs: [],
         checklist: emptyChecklist(stage),
         memory: { concerns: [], preferences: [] },
+        talkTimeMinutes: 0,
         ...input,
       };
       created = lead;
@@ -291,8 +323,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             outcome: log.outcome,
             notes: log.notes,
             agentId: s.currentAgentId,
+            durationMinutes: log.durationMinutes || 0,
           };
-          return { ...l, callLogs: [entry, ...l.callLogs], lastContactAt: entry.at };
+          const newLogs = [entry, ...l.callLogs];
+          const talkTimeMinutes = newLogs.reduce((sum, c) => sum + (c.durationMinutes || 0), 0);
+          return { ...l, callLogs: newLogs, lastContactAt: entry.at, talkTimeMinutes };
         }),
       }));
     },
@@ -406,6 +441,52 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
   }, []);
 
+  const sendMessage = useCallback((messageId: string, text: string) => {
+    if (!text.trim()) return;
+    setState((s) => ({
+      ...s,
+      messages: s.messages.map((m) => {
+        if (m.id !== messageId) return m;
+        const out: ChatMessage = {
+          id: uid('m'),
+          direction: 'out',
+          text: text.trim(),
+          at: new Date().toISOString(),
+          status: 'sent',
+        };
+        return {
+          ...m,
+          isRead: true,
+          preview: text.trim().slice(0, 80),
+          thread: [...(m.thread || []), out],
+        };
+      }),
+    }));
+
+    // Simulate an incoming reply after ~1.4s for the demo — so agents can see
+    // the two-way chat feel without an actual backend.
+    setTimeout(() => {
+      setState((s) => ({
+        ...s,
+        messages: s.messages.map((m) => {
+          if (m.id !== messageId) return m;
+          const reply: ChatMessage = {
+            id: uid('m'),
+            direction: 'in',
+            text: pickReply(text),
+            at: new Date().toISOString(),
+          };
+          return {
+            ...m,
+            preview: reply.text.slice(0, 80),
+            receivedAt: reply.at,
+            thread: [...(m.thread || []), reply],
+          };
+        }),
+      }));
+    }, 1400);
+  }, []);
+
   const convertMessageToLead = useCallback((messageId: string): Lead | null => {
     let created: Lead | null = null;
     setState((s) => {
@@ -439,6 +520,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         callLogs: [],
         checklist: emptyChecklist('New'),
         memory: { concerns: [], preferences: [] },
+        talkTimeMinutes: 0,
       };
       created = lead;
       const agentName = s.agents.find((a) => a.id === assignedAgentId)?.name ?? 'agent';
@@ -472,6 +554,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const markAllNotificationsRead = useCallback(() => {
     setState((s) => ({ ...s, notifications: s.notifications.map((n) => ({ ...n, read: true })) }));
+  }, []);
+
+  // ---- Notes ------------------------------------------------------------
+  const addNote = useCallback((text: string, color: StickyNote['color'] = 'gold') => {
+    if (!text.trim()) return;
+    setState((s) => ({
+      ...s,
+      notes: [
+        { id: uid('note'), text: text.trim(), color, createdAt: new Date().toISOString() },
+        ...s.notes,
+      ],
+    }));
+  }, []);
+
+  const updateNote = useCallback((id: string, patch: Partial<StickyNote>) => {
+    setState((s) => ({ ...s, notes: s.notes.map((n) => (n.id === id ? { ...n, ...patch } : n)) }));
+  }, []);
+
+  const deleteNote = useCallback((id: string) => {
+    setState((s) => ({ ...s, notes: s.notes.filter((n) => n.id !== id) }));
+  }, []);
+
+  const togglePinNote = useCallback((id: string) => {
+    setState((s) => ({
+      ...s,
+      notes: s.notes.map((n) => (n.id === id ? { ...n, pinned: !n.pinned } : n)),
+    }));
   }, []);
 
   const getMatchingProperties = useCallback(
@@ -510,6 +619,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       storage.removeItem(KEYS.tasks),
       storage.removeItem(KEYS.messages),
       storage.removeItem(KEYS.notifications),
+      storage.removeItem(KEYS.notes),
     ]);
     setState({
       role: 'agent',
@@ -520,6 +630,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       tasks: seedTasks,
       messages: seedMessages,
       notifications: seedNotifications,
+      notes: seedNotes,
       hydrated: true,
     });
   }, []);
@@ -543,10 +654,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toggleTask,
       deleteTask,
       markMessageRead,
+      sendMessage,
       convertMessageToLead,
       markNotificationRead,
       markAllNotificationsRead,
       pushNotification,
+      addNote,
+      updateNote,
+      deleteNote,
+      togglePinNote,
       getMatchingProperties,
       reseed,
     }),
@@ -568,10 +684,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toggleTask,
       deleteTask,
       markMessageRead,
+      sendMessage,
       convertMessageToLead,
       markNotificationRead,
       markAllNotificationsRead,
       pushNotification,
+      addNote,
+      updateNote,
+      deleteNote,
+      togglePinNote,
       getMatchingProperties,
       reseed,
     ],
